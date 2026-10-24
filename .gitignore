@@ -1,0 +1,7 @@
+@'
+/build/
+/build-docker/
+/_Word/
+/STARTER_README.md
+/starterandspec.zip
+'@ | Add-Content .gitignore
