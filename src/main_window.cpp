@@ -1,76 +1,296 @@
 #include "aiws/gui/main_window.hpp"
 
+#include "aiws/gui/context_widget.hpp"
+#include "aiws/gui/resettable.hpp"
+#include "aiws/gui/search_widget.hpp"
+#include "aiws/gui/term_inspector_widget.hpp"
+#include "aiws/gui/workspace_widget.hpp"
+
+#include <QFile>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QVBoxLayout>
+
+#include <exception>
+#include <utility>
+
+
 namespace aiws::gui {
 
+
+    //
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
-    // TODO: Construct the M3 application window, compose the GUI components,
-    // establish layouts/presentation, connect events, and establish initial state.
-}
+    // DONE: Constructed the M3 application window, composde the GUI components,
+    // established layouts/presentation, connected events, and established initial state.
+    setWindowTitle("AI Workspace");
+    resize(900, 900);
 
-void MainWindow::set_exit_callback(ExitCallback callback) noexcept {
-    // TODO
-    (void)callback;  // To suppress unused-parameter warning.
-}
+    auto* central = new QWidget(this);
+    setCentralWidget(central);
 
+    auto* layout = new QVBoxLayout(central);
+
+    auto* heading = new QLabel("AI Workspace", central);
+
+    auto* status_layout = new QHBoxLayout;
+
+    auto* bottom_layout = new QHBoxLayout;
+    
+    heading->setStyleSheet(
+        "background-color: #243b53;"
+        "color: white;"
+        "font-size: 20px;"
+        "padding: 10px;");
+    layout->addWidget(heading);
+
+    workspace_widget_ =new WorkspaceWidget(central);
+    search_widget_ = new SearchWidget(central);
+    term_inspector_widget_ =new TermInspectorWidget(central);
+    context_widget_= new ContextWidget(central);
+
+    layout->addWidget(workspace_widget_, 2);
+    layout->addWidget(search_widget_, 3);
+
+    
+    bottom_layout->addWidget(term_inspector_widget_, 1);
+    bottom_layout->addWidget(context_widget_, 1);
+    layout->addLayout(bottom_layout, 2);
+
+    status_label_= new QLabel("Ready.", central);
+    reset_button_= new QPushButton("Reset", central);
+    exit_button_= new QPushButton("Exit", central);
+
+    reset_button_->setStyleSheet( "background-color: #355e3b; color: white;");
+    exit_button_->setStyleSheet( "background-color: #8b3030; color: white;");
+
+    
+    status_layout->addWidget(status_label_, 1);
+    status_layout->addWidget(reset_button_);
+    status_layout->addWidget(exit_button_);
+    layout->addLayout(status_layout);
+
+    connect(workspace_widget_, &WorkspaceWidget::add_document_requested, this,&MainWindow::add_document);
+
+    connect(workspace_widget_,
+            &WorkspaceWidget::build_corpus_requested, this, &MainWindow::build_corpus);
+
+    connect(workspace_widget_,
+            &WorkspaceWidget::document_selected, this, &MainWindow::document_selected);
+
+    connect(search_widget_, &SearchWidget::search_requested, this, &MainWindow::search_requested);
+
+    connect(search_widget_,&SearchWidget::query_changed, this, &MainWindow::query_changed);
+
+    connect(search_widget_, &SearchWidget::source_document_requested,this, &MainWindow::source_document_requested);
+    connect(search_widget_, &SearchWidget::selected_chunk_changed, term_inspector_widget_, &TermInspectorWidget::set_selected_chunk);
+    
+    connect(term_inspector_widget_, &TermInspectorWidget::term_inspection_requested, this, &MainWindow::term_inspection_requested);
+    connect(context_widget_,&ContextWidget::build_context_requested,this, &MainWindow::build_context_requested);
+    
+    connect(reset_button_, &QPushButton::clicked,this, &MainWindow::reset_application);
+    connect(exit_button_, &QPushButton::clicked, this, &MainWindow::exit_application);
+
+    update_action_states();}
+
+
+    //
+void MainWindow::set_exit_callback(ExitCallback callback) noexcept { exit_callback_ = callback; }
+
+
+    //
 void MainWindow::add_document() {
-    // TODO
-}
+    QString path = QFileDialog::getOpenFileName(this, "Add Document", QString(),
+        "Text files (*.txt);;All files (*)");
 
+    if (path.isEmpty()) { return; }
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::warning( this, "File Error", file.errorString());
+        return; }
+
+    QString text = QString::fromUtf8(file.readAll());
+
+    if (file.error() != QFileDevice::NoError) {
+        QMessageBox::warning(this, "File Error", file.errorString());
+        return; }
+
+    QFileInfo info(path);
+    QString id = info.absoluteFilePath();
+    QString title = info.fileName();
+
+    try { workspace_.add_document(Document( id.toStdString(), title.toStdString(),text.toStdString()));
+        workspace_widget_->add_document(title);
+        invalidate_corpus();
+        status_label_->setText("Added doc! Please build corpus to carry on."); }
+     catch (const std::exception& error)
+    { QMessageBox::warning( this, "Add Document Error", QString::fromUtf8(error.what())); } }
+
+
+    //
 void MainWindow::build_corpus() {
-    // TODO
-}
+    if (workspace_.documents().empty()) {return; }
 
+    try {
+        processing_core_.rebuild(workspace_);
+        corpus_current_ = true;
+
+        clear_processing_outputs();
+
+        workspace_widget_->set_corpus_status(
+            QString("Corpus: %1 chunks").arg(
+                static_cast<qulonglong>(
+                    processing_core_.chunk_count())));
+
+        update_action_states();
+        status_label_->setText("Corpus built.");
+    } catch (const std::exception& error) {
+        invalidate_corpus();
+        status_label_->setText("Corpus build failed.");
+
+        QMessageBox::warning( this, "Build Error", QString::fromUtf8(error.what())); } }
+
+
+    //
 void MainWindow::document_selected(int row) {
-    // TODO
-    (void)row;  // To suppress unused-parameter warning.
-}
+    const auto& documents = workspace_.documents();
 
+    if (row < 0 || static_cast<std::size_t>(row) >= documents.size()) {
+        workspace_widget_->clear_selected_document();
+        return; }
+
+    const auto& document =documents[static_cast<std::size_t>(row)];
+
+    workspace_widget_->show_selected_document(
+        QString::fromStdString(document.title()),
+        QString::fromStdString(document.text())); }
+
+
+    //
 void MainWindow::search_requested(const QString& query, int k) {
-    // TODO
-    (void)query;  // To suppress unused-parameter warning.
-    (void)k;  // To suppress unused-parameter warning.
-}
+    if (!corpus_current_ || query.trimmed().isEmpty()) { return; }
 
-void MainWindow::query_changed(const QString& query) {
-    // TODO
-    (void)query;  // To suppress unused-parameter warning.
-}
+    try {
+        auto results = processing_core_.search(query.toStdString(), k);
+        search_widget_->set_results(std::move(results));
+        term_inspector_widget_->clear_statistics();
+        context_widget_->clear_context();
 
+        status_label_->setText("Search complete."); } 
+        catch (const std::exception& error) {
+        QMessageBox::warning( this, "Search Error",QString::fromUtf8(error.what())); } }
+
+
+
+
+    //
+void MainWindow::query_changed(const QString&) { update_action_states(); }
+
+
+
+    //
 void MainWindow::build_context_requested(int token_budget) {
-    // TODO
-    (void)token_budget;  // To suppress unused-parameter warning.
-}
+    if (!corpus_current_ || !search_widget_->has_query()) { return;  }
 
-void MainWindow::source_document_requested(const QString& document_id) {
-    // TODO
-    (void)document_id;  // To suppress unused-parameter warning.
-}
+    try {
+        auto items = processing_core_.build_context(
+            search_widget_->query().toStdString(),
+            search_widget_->result_count(),
+            static_cast<std::size_t>(token_budget));
 
-void MainWindow::term_inspection_requested(const QString& term,
-                                           const QString& chunk_id) {
-    // TODO
-    (void)term;  // To suppress unused-parameter warning.
-    (void)chunk_id;  // To suppress unused-parameter warning.
-}
+        context_widget_->set_context(items);
+        status_label_->setText("Context built.");
+    } catch (const std::exception& error) {
+        QMessageBox::warning(
+            this, "Context Error",
+            QString::fromUtf8(error.what())); } }
 
+
+    //
+void MainWindow::source_document_requested( const QString& document_id) {
+
+    const auto& documents = workspace_.documents();
+    for (std::size_t row = 0; row < documents.size(); ++row) {
+        if (documents[row].id() == document_id.toStdString()) 
+            { workspace_widget_->select_document( static_cast<int>(row));
+            document_selected(static_cast<int>(row));
+            return; } } }
+
+
+
+    //
+void MainWindow::term_inspection_requested(
+    const QString& term, const QString& chunk_id) {
+
+    if (!corpus_current_ || term.trimmed().isEmpty()) { return; }
+
+    try {
+        std::size_t df = processing_core_.document_frequency( term.toStdString());
+        bool has_chunk = !chunk_id.isEmpty();
+        std::size_t tf = 0;
+
+        if (has_chunk) { tf = processing_core_.term_frequency(term.toStdString(), chunk_id.toStdString());}
+        term_inspector_widget_->set_statistics( df, has_chunk, tf);
+
+        status_label_->setText("Term inspected.");
+        } catch (const std::exception& error) {
+        term_inspector_widget_->clear_statistics();
+
+        QMessageBox::warning(this, "Inspection Error",QString::fromUtf8(error.what())); }}
+
+    //
 void MainWindow::reset_application() {
-    // TODO
-}
+    corpus_current_ = false;
+    workspace_.clear();
+    processing_core_ = ProcessingCore();
 
-void MainWindow::exit_application() {
-    // TODO
-}
+    Resettable* components[] = {
+        workspace_widget_,
+        search_widget_,
+        term_inspector_widget_,
+        context_widget_
+    };
 
+    for (Resettable* component : components) {component->reset();}
+
+    update_action_states();
+    status_label_->setText("Application reset."); }
+
+
+    //
+void MainWindow::exit_application() { if (exit_callback_ != nullptr) { exit_callback_(this); } }
+
+
+    //
 void MainWindow::update_action_states() {
-    // TODO
-}
+    workspace_widget_->set_build_corpus_enabled(!workspace_.documents().empty());
 
+    bool can_process =corpus_current_ && search_widget_->has_query();
+
+    search_widget_->set_search_enabled(can_process);
+    context_widget_->set_build_context_enabled(can_process);
+    term_inspector_widget_->set_inspection_enabled(corpus_current_); }
+
+
+    //
 void MainWindow::invalidate_corpus() {
-    // TODO
-}
+    corpus_current_ = false;
+    clear_processing_outputs();
 
+    workspace_widget_->set_corpus_status("Corpus: Not built");
+    update_action_states(); }
+
+
+    //
 void MainWindow::clear_processing_outputs() {
-    // TODO
-}
+    search_widget_->clear_results();
+    term_inspector_widget_->set_selected_chunk(QString());
+    term_inspector_widget_->clear_statistics();
+    context_widget_->clear_context(); }
+
 
 }  // namespace aiws::gui

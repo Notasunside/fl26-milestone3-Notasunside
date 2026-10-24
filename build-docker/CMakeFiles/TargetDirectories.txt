@@ -1,0 +1,6 @@
+/work/build-docker/CMakeFiles/aiws_m2.dir
+/work/build-docker/CMakeFiles/ai_workspace_m3.dir
+/work/build-docker/CMakeFiles/edit_cache.dir
+/work/build-docker/CMakeFiles/rebuild_cache.dir
+/work/build-docker/CMakeFiles/ai_workspace_m3_autogen_timestamp_deps.dir
+/work/build-docker/CMakeFiles/ai_workspace_m3_autogen.dir

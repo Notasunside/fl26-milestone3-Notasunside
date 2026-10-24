@@ -80,8 +80,7 @@ void WorkspaceWidget::reset() {
     clear_selected_document();
     set_corpus_status("Corpus: Not built");
     set_build_corpus_enabled(false);
-    add_document_button_->setEnabled(true);
-}
+    add_document_button_->setEnabled(true); }
 
 }  // namespace aiws::gui
 

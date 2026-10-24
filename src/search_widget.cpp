@@ -48,6 +48,12 @@ SearchWidget::SearchWidget(QWidget* parent) : QWidget(parent) {
     result_model_ = new SearchResultModel(this);
     results_view_ = new QTableView(query_box);
     results_view_->setModel(result_model_);
+
+    //new addition
+    //fixed: cannot scroll through search results
+    results_view_->setMinimumHeight(120);
+    results_view_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+
     results_view_->setSelectionBehavior(QAbstractItemView::SelectRows);
     results_view_->setSelectionMode(QAbstractItemView::SingleSelection);
     results_view_->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -58,6 +64,9 @@ SearchWidget::SearchWidget(QWidget* parent) : QWidget(parent) {
     selected_result_text_ = new QPlainTextEdit(query_box);
     selected_result_text_->setReadOnly(true);
 
+    //fix: cannot scroll through selected result text
+    selected_result_text_->setMinimumHeight(100);
+
     view_source_button_ = new QPushButton("View Source", query_box);
 
     layout->addLayout(controls);
@@ -65,6 +74,10 @@ SearchWidget::SearchWidget(QWidget* parent) : QWidget(parent) {
     layout->addWidget(results_view_, 2);
     layout->addWidget(new QLabel("Selected Result", query_box));
     layout->addWidget(selected_result_text_, 1);
+    
+    //fix: moved view source button to the bottom of the search widget
+    layout->addSpacing(8);
+
     layout->addWidget(view_source_button_);
 
     auto* main_layout = new QVBoxLayout(this);
