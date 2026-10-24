@@ -21,6 +21,8 @@
 
 namespace aiws::gui {
 
+
+    //
 SearchWidget::SearchWidget(QWidget* parent) : QWidget(parent) {
     // Constructed and laid out the Query, Search Results, and Selected Result
     // areas; configured the table/model; connected local events; established initial state.
@@ -79,12 +81,20 @@ SearchWidget::SearchWidget(QWidget* parent) : QWidget(parent) {
 
 QString SearchWidget::query() const { return query_edit_->text();}
 
+
+    //
 int SearchWidget::result_count() const { return result_count_spin_->value(); }
 
+
+    //
 bool SearchWidget::has_query() const { return !query().trimmed().isEmpty(); }
 
+
+    //
 void SearchWidget::set_search_enabled(bool enabled) { search_button_->setEnabled(enabled); }
 
+
+    //
 void SearchWidget::set_results(std::vector<SearchResult> results) {
      result_model_->set_results(std::move(results));
     results_view_->selectionModel()->clear();
@@ -92,18 +102,27 @@ void SearchWidget::set_results(std::vector<SearchResult> results) {
     view_source_button_->setEnabled(false);
     emit selected_chunk_changed(QString()); }
 
+
+
+    //
 void SearchWidget::clear_results() { set_results({}); }
 
+
+    //
 void SearchWidget::reset() {
     query_edit_->clear();
     result_count_spin_->setValue(3);
     clear_results();
     set_search_enabled(false); }
 
+
+    //
 void SearchWidget::request_search() {
      if (search_button_->isEnabled() && has_query()) 
         { emit search_requested(query(), result_count()); }}
 
+
+    // 
 void SearchWidget::show_selected_result() {
     const auto rows = results_view_->selectionModel()->selectedRows();
 
@@ -130,15 +149,15 @@ void SearchWidget::show_selected_result() {
 
     emit selected_chunk_changed(QString::fromStdString(result->chunk_id)); }
 
+
+    //
 void SearchWidget::request_source_document() {
     const auto rows = results_view_->selectionModel()->selectedRows();
     if (rows.isEmpty()) 
      { return; }
 
     const SearchResult* result =result_model_->result_at(rows.first().row());
-
     if (result != nullptr)
-     {emit source_document_requested(QString::fromStdString(result->document_id));}
-}
+     {emit source_document_requested(QString::fromStdString(result->document_id));} }
 
 }  // namespace aiws::gui
