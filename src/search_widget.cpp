@@ -1,55 +1,144 @@
 #include "aiws/gui/search_widget.hpp"
 
+
+#include "aiws/gui/search_result_model.hpp"
+
+#include <QAbstractItemView>
+#include <QGroupBox>
+#include <QHeaderView>
+#include <QHBoxLayout>
+#include <QItemSelectionModel>
+#include <QLabel>
+#include <QLineEdit>
+#include <QPlainTextEdit>
+#include <QPushButton>
+#include <QSpinBox>
+#include <QTableView>
+#include <QVBoxLayout>
+
+#include <utility>
+
+
 namespace aiws::gui {
 
 SearchWidget::SearchWidget(QWidget* parent) : QWidget(parent) {
-    // TODO: Construct and lay out the Query, Search Results, and Selected Result
-    // areas; configure the table/model; connect local events; establish initial state.
+    // Constructed and laid out the Query, Search Results, and Selected Result
+    // areas; configured the table/model; connected local events; established initial state.
+    auto* query_box = new QGroupBox("Query", this);
+
+        auto* layout = new QVBoxLayout(query_box);
+
+        //class member variable
+    query_edit_ = new QLineEdit(query_box);
+
+    result_count_spin_ = new QSpinBox(query_box);
+    result_count_spin_->setRange(1, 100);
+
+    search_button_ = new QPushButton("Search", query_box);
+
+    auto* controls = new QHBoxLayout;
+    controls->addWidget(new QLabel("Query:", query_box));
+    controls->addWidget(query_edit_, 1);
+    controls->addWidget(new QLabel("Results:", query_box));
+    controls->addWidget(result_count_spin_);
+    controls->addWidget(search_button_);
+
+    result_model_ = new SearchResultModel(this);
+    results_view_ = new QTableView(query_box);
+    results_view_->setModel(result_model_);
+    results_view_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    results_view_->setSelectionMode(QAbstractItemView::SingleSelection);
+    results_view_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    //--<QHeaderView> added after building
+    results_view_->setWordWrap(false); 
+    results_view_->horizontalHeader()->setStretchLastSection(true);
+
+    selected_result_text_ = new QPlainTextEdit(query_box);
+    selected_result_text_->setReadOnly(true);
+
+    view_source_button_ = new QPushButton("View Source", query_box);
+
+    layout->addLayout(controls);
+    layout->addWidget(new QLabel("Search Results", query_box));
+    layout->addWidget(results_view_, 2);
+    layout->addWidget(new QLabel("Selected Result", query_box));
+    layout->addWidget(selected_result_text_, 1);
+    layout->addWidget(view_source_button_);
+
+    auto* main_layout = new QVBoxLayout(this);
+    main_layout->addWidget(query_box);
+
+    connect(search_button_, &QPushButton::clicked, this, &SearchWidget::request_search);
+    connect(query_edit_, &QLineEdit::textChanged,this, &SearchWidget::query_changed);
+    connect(results_view_->selectionModel(), &QItemSelectionModel::selectionChanged, this, &SearchWidget::show_selected_result);
+
+    connect(view_source_button_, &QPushButton::clicked,this, &SearchWidget::request_source_document);
+
+    reset();
 }
 
-QString SearchWidget::query() const {
-    // TODO
-    return {};
-}
+QString SearchWidget::query() const { return query_edit_->text();}
 
-int SearchWidget::result_count() const {
-    // TODO
-    return 0;
-}
+int SearchWidget::result_count() const { return result_count_spin_->value(); }
 
-bool SearchWidget::has_query() const {
-    // TODO
-    return false;
-}
+bool SearchWidget::has_query() const { return !query().trimmed().isEmpty(); }
 
-void SearchWidget::set_search_enabled(bool enabled) {
-    // TODO
-    (void)enabled;  // To suppress unused-parameter warning.
-}
+void SearchWidget::set_search_enabled(bool enabled) { search_button_->setEnabled(enabled); }
 
 void SearchWidget::set_results(std::vector<SearchResult> results) {
-    // TODO
-    (void)results;  // To suppress unused-parameter warning.
-}
+     result_model_->set_results(std::move(results));
+    results_view_->selectionModel()->clear();
+    selected_result_text_->clear();
+    view_source_button_->setEnabled(false);
+    emit selected_chunk_changed(QString()); }
 
-void SearchWidget::clear_results() {
-    // TODO
-}
+void SearchWidget::clear_results() { set_results({}); }
 
 void SearchWidget::reset() {
-    // TODO
-}
+    query_edit_->clear();
+    result_count_spin_->setValue(3);
+    clear_results();
+    set_search_enabled(false); }
 
 void SearchWidget::request_search() {
-    // TODO
-}
+     if (search_button_->isEnabled() && has_query()) 
+        { emit search_requested(query(), result_count()); }}
 
 void SearchWidget::show_selected_result() {
-    // TODO
-}
+    const auto rows = results_view_->selectionModel()->selectedRows();
+
+    const SearchResult* result = nullptr;
+    if (!rows.isEmpty()) 
+     { result = result_model_->result_at(rows.first().row());}
+
+    if (result == nullptr) {
+        selected_result_text_->clear();
+        view_source_button_->setEnabled(false);
+        emit selected_chunk_changed(QString());
+        return; }
+
+    QString details;
+    details += "Document: " + QString::fromStdString(result->document_id);
+    details += "\nChunk ID: " + QString::fromStdString(result->chunk_id);
+    details += "\nChunk: " + QString::number(static_cast<qulonglong>(result->chunk_sequence));
+    details += "\nScore: " + QString::number(result->score);
+    details += "\nMatched terms: " + QString::number(static_cast<qulonglong>(result->matched_terms));
+    details += "\nText:\n" + QString::fromStdString(result->text);
+
+    selected_result_text_->setPlainText(details);
+    view_source_button_->setEnabled(true);
+
+    emit selected_chunk_changed(QString::fromStdString(result->chunk_id)); }
 
 void SearchWidget::request_source_document() {
-    // TODO
+    const auto rows = results_view_->selectionModel()->selectedRows();
+    if (rows.isEmpty()) 
+     { return; }
+
+    const SearchResult* result =result_model_->result_at(rows.first().row());
+
+    if (result != nullptr)
+     {emit source_document_requested(QString::fromStdString(result->document_id));}
 }
 
 }  // namespace aiws::gui
