@@ -73,7 +73,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     status_layout->addWidget(exit_button_);
     layout->addLayout(status_layout);
 
-    connect(workspace_widget_, &WorkspaceWidget::add_document_requested, this,&MainWindow::add_document); //ADDDOC1 2 // Receive widget request -> run MainWindow::add_document()
+    connect(workspace_widget_, &WorkspaceWidget::add_document_requested, this,&MainWindow::add_document);
 
     connect(workspace_widget_,
             &WorkspaceWidget::build_corpus_requested, this, &MainWindow::build_corpus);
@@ -81,12 +81,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(workspace_widget_,
             &WorkspaceWidget::document_selected, this, &MainWindow::document_selected);
 
-    connect(search_widget_, &SearchWidget::search_requested, this, &MainWindow::search_requested); //SEARCH1 2
+    connect(search_widget_, &SearchWidget::search_requested, this, &MainWindow::search_requested);
 
     connect(search_widget_,&SearchWidget::query_changed, this, &MainWindow::query_changed);
 
     connect(search_widget_, &SearchWidget::source_document_requested,this, &MainWindow::source_document_requested);
-    connect(search_widget_, &SearchWidget::selected_chunk_changed, term_inspector_widget_, &TermInspectorWidget::set_selected_chunk);  //SELECTROW1 5 // sends chunk id to TermINspectorWidget
+    connect(search_widget_, &SearchWidget::selected_chunk_changed, term_inspector_widget_, &TermInspectorWidget::set_selected_chunk);
     
     connect(term_inspector_widget_, &TermInspectorWidget::term_inspection_requested, this, &MainWindow::term_inspection_requested);
     connect(context_widget_,&ContextWidget::build_context_requested,this, &MainWindow::build_context_requested);
@@ -102,8 +102,7 @@ void MainWindow::set_exit_callback(ExitCallback callback) noexcept { exit_callba
 
 
     //
-void MainWindow::add_document() { //ADDDOC1 3 
-    // Receive widget request -> run MainWindow::add_document()
+void MainWindow::add_document() {
     QString path = QFileDialog::getOpenFileName(this, "Add Document", QString(),
         "Text files (*.txt);;All files (*)");
 
@@ -124,30 +123,30 @@ void MainWindow::add_document() { //ADDDOC1 3
     QString id = info.absoluteFilePath();
     QString title = info.fileName();
 
-    try { workspace_.add_document(Document( id.toStdString(), title.toStdString(),text.toStdString())); // ADDDOC1 4 ... Store document in Workspace; corpus has not changed
-        workspace_widget_->add_document(title);                                                         // ADDDOC1 5 ... Update GUI document list
-        invalidate_corpus();                                                                            //ADDDOC1 6 ... Workspace changed -> old chunks/index are now stale
+    try { workspace_.add_document(Document( id.toStdString(), title.toStdString(),text.toStdString()));
+        workspace_widget_->add_document(title);
+        invalidate_corpus();
         status_label_->setText("Added doc! Please build corpus to carry on."); }
      catch (const std::exception& error)
     { QMessageBox::warning( this, "Add Document Error", QString::fromUtf8(error.what())); } }
 
 
     //
-void MainWindow::build_corpus() { // ADDDOC1 11 ... Rebuild chunks/index from present Workspace; mark current after success
+void MainWindow::build_corpus() {
     if (workspace_.documents().empty()) {return; }
 
     try {
         processing_core_.rebuild(workspace_);
-        corpus_current_ = true; // ADDDOC1 8 ... Mark backend corpus as stale
+        corpus_current_ = true;
 
-        clear_processing_outputs(); // Remove outputs that depended on the previous corpus
+        clear_processing_outputs();
 
         workspace_widget_->set_corpus_status(
             QString("Corpus: %1 chunks").arg(
                 static_cast<qulonglong>(
                     processing_core_.chunk_count())));
 
-        update_action_states();                 //ADDDOC1 9 ... Show stale status and disable processing
+        update_action_states();
         status_label_->setText("Corpus built.");
     } catch (const std::exception& error) {
         invalidate_corpus();
@@ -244,7 +243,7 @@ void MainWindow::term_inspection_requested(
         QMessageBox::warning(this, "Inspection Error",QString::fromUtf8(error.what())); }}
 
     //
-void MainWindow::reset_application() { 
+void MainWindow::reset_application() {
     corpus_current_ = false;
     workspace_.clear();
     processing_core_ = ProcessingCore();
@@ -256,18 +255,18 @@ void MainWindow::reset_application() {
         context_widget_
     };
 
-    for (Resettable* component : components) {component->reset();} //RESET1 1  // Virtual call through Resettable*
- 
+    for (Resettable* component : components) {component->reset();}
+
     update_action_states();
     status_label_->setText("Application reset."); }
 
 
     //
-void MainWindow::exit_application() { if (exit_callback_ != nullptr) { exit_callback_(this); } } //EXIT1 2 // check of stored callback pointer
+void MainWindow::exit_application() { if (exit_callback_ != nullptr) { exit_callback_(this); } }
 
 
     //
-void MainWindow::update_action_states() { //ADDDOC1 10 ... Enable/disable GUI actions based on current state of workspace and corpus
+void MainWindow::update_action_states() {
     workspace_widget_->set_build_corpus_enabled(!workspace_.documents().empty());
 
     bool can_process =corpus_current_ && search_widget_->has_query();
@@ -280,14 +279,14 @@ void MainWindow::update_action_states() { //ADDDOC1 10 ... Enable/disable GUI ac
     //
 void MainWindow::invalidate_corpus() {
     corpus_current_ = false;
-    clear_processing_outputs(); 
+    clear_processing_outputs();
 
     workspace_widget_->set_corpus_status("Corpus: Not built");
     update_action_states(); }
 
 
     //
-void MainWindow::clear_processing_outputs() { // ADDDOC1 7 ... Clear dependent GUI state; this does not rebuild the backend
+void MainWindow::clear_processing_outputs() {
     search_widget_->clear_results();
     term_inspector_widget_->set_selected_chunk(QString());
     term_inspector_widget_->clear_statistics();

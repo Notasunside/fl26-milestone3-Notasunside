@@ -113,7 +113,7 @@ std::size_t ProcessingCore::term_frequency(const std::string& term,
     return impl_->index.term_frequency(terms.front(), chunk_id);
 }
 
-std::vector<SearchResult> ProcessingCore::search(const std::string& query, int k) const { //SEARCH1 3
+std::vector<SearchResult> ProcessingCore::search(const std::string& query, int k) const {
     // return impl_->retrieval.search(query, k, impl_->chunks, impl_->index);
      return impl_->retrieval->search(query, k, impl_->chunks, impl_->index);
 }

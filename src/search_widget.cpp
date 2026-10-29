@@ -85,7 +85,7 @@ SearchWidget::SearchWidget(QWidget* parent) : QWidget(parent) {
 
     connect(search_button_, &QPushButton::clicked, this, &SearchWidget::request_search);
     connect(query_edit_, &QLineEdit::textChanged,this, &SearchWidget::query_changed);
-    connect(results_view_->selectionModel(), &QItemSelectionModel::selectionChanged, this, &SearchWidget::show_selected_result);  //SELECTROW1 2 // connects the section changed signal to the show_selected_result slot
+    connect(results_view_->selectionModel(), &QItemSelectionModel::selectionChanged, this, &SearchWidget::show_selected_result);
 
     connect(view_source_button_, &QPushButton::clicked,this, &SearchWidget::request_source_document);
 
@@ -108,7 +108,7 @@ void SearchWidget::set_search_enabled(bool enabled) { search_button_->setEnabled
 
 
     //
-void SearchWidget::set_results(std::vector<SearchResult> results) { //SEARCH1 4
+void SearchWidget::set_results(std::vector<SearchResult> results) {
      result_model_->set_results(std::move(results));
     results_view_->selectionModel()->clear();
     selected_result_text_->clear();
@@ -129,24 +129,24 @@ void SearchWidget::reset() {
     set_search_enabled(false); }
 
 
-    //SEARCH1 
+    //
 void SearchWidget::request_search() {
      if (search_button_->isEnabled() && has_query()) 
-        { emit search_requested(query(), result_count()); }} //SEARCH1 1
+        { emit search_requested(query(), result_count()); }}
 
 
     // 
-void SearchWidget::show_selected_result() { 
-    const auto rows = results_view_->selectionModel()->selectedRows(); //SELECTROW1 1 
+void SearchWidget::show_selected_result() {
+    const auto rows = results_view_->selectionModel()->selectedRows();
 
     const SearchResult* result = nullptr;
     if (!rows.isEmpty()) 
-     { result = result_model_->result_at(rows.first().row());} //SELECTROW1 3 // get the first selected row and retrieve the corresponding SearchResult from the model
+     { result = result_model_->result_at(rows.first().row());}
 
     if (result == nullptr) {
         selected_result_text_->clear();
         view_source_button_->setEnabled(false);
-        emit selected_chunk_changed(QString()); // //SELECTROW1 4 // emit signal with empty chunk_id when no result is selected
+        emit selected_chunk_changed(QString());
         return; }
 
     QString details;
@@ -169,7 +169,7 @@ void SearchWidget::request_source_document() {
     if (rows.isEmpty()) 
      { return; }
 
-    const SearchResult* result =result_model_->result_at(rows.first().row()); 
+    const SearchResult* result =result_model_->result_at(rows.first().row());
     if (result != nullptr)
      {emit source_document_requested(QString::fromStdString(result->document_id));} }
 

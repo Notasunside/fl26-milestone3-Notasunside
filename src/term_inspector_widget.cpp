@@ -53,7 +53,7 @@ void TermInspectorWidget::set_inspection_enabled(bool enabled) { inspect_button_
 
 
     //
-void TermInspectorWidget::set_selected_chunk(const QString& chunk_id) {  //SELECTROW1 6 // receives chunk id from SearchWidget and stores it for later use
+void TermInspectorWidget::set_selected_chunk(const QString& chunk_id) {
     selected_chunk_id_ = chunk_id;
      //  previous TF belongs to the previous selection.
     chunk_frequency_value_->clear(); }
