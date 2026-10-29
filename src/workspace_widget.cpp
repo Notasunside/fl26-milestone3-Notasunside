@@ -46,7 +46,7 @@ WorkspaceWidget::WorkspaceWidget(QWidget* parent) : QWidget(parent) {
     main_layout->addWidget(workspace_box, 1);
     main_layout->addWidget(selected_box, 1);
 
-    connect(add_document_button_, &QPushButton::clicked, this, &WorkspaceWidget::add_document_requested);
+    connect(add_document_button_, &QPushButton::clicked, this, &WorkspaceWidget::add_document_requested); //ADDDOC1 1 announce request to MainWindow 
     connect(build_corpus_button_, &QPushButton::clicked, this, &WorkspaceWidget::build_corpus_requested);
     connect(document_list_, &QListWidget::currentRowChanged, this, &WorkspaceWidget::document_selected);
 
